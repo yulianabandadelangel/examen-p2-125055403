@@ -1,0 +1,17 @@
+# Dataset (no se sube al repo)
+*.csv
+data/*
+!data/.gitkeep
+
+# Salidas de los jobs
+output/*
+!output/.gitkeep
+
+# Credenciales
+.env
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+build.log

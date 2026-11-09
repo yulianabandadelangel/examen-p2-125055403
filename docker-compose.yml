@@ -1,0 +1,55 @@
+name: datamart
+
+services:
+  hadoop:
+    build: ./hadoop
+    hostname: hadoop
+    environment:
+      MATRICULA: ${MATRICULA}
+    volumes:
+      - ./data:/data/input:ro          # dataset, SOLO LECTURA
+      - ./output:/data/output          # salida del job (visible en el host)
+      - ./mapreduce:/opt/mapreduce     # mapper/reducer: se editan sin reconstruir la imagen
+      - ssh-shared:/ssh-shared         # llave para que api entre por SSH
+    networks:
+      - datamart-net
+
+  db:
+    image: postgres:16-bookworm
+    env_file: .env                     # POSTGRES_USER / POSTGRES_PASSWORD / POSTGRES_DB
+    volumes:
+      - pgdata:/var/lib/postgresql/data   # volumen nombrado -> persistencia
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - datamart-net
+
+  api:
+    build: ./api
+    env_file: .env
+    environment:
+      DB_HOST: db                      # se conecta a la BD por nombre de servicio
+    ports:
+      - "${API_PORT:-8000}:5000"       # puerto_host:puerto_contenedor
+    depends_on:
+      db:
+        condition: service_healthy     # espera a que PostgreSQL acepte conexiones
+      hadoop:
+        condition: service_started
+    volumes:
+      - ./scripts:/opt/scripts:ro
+      - ./output:/data/output:ro
+      - ssh-shared:/ssh-shared:ro
+    networks:
+      - datamart-net
+
+volumes:
+  pgdata:
+  ssh-shared:
+
+networks:
+  datamart-net:
+    driver: bridge
